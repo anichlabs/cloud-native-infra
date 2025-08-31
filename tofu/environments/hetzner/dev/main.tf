@@ -28,7 +28,11 @@ module "headscale_server" {
   region        = "fsn1"
   server_type   = "cx22"                # best value choice.
   ssh_key_name  = "tuxedo-ed25519"      # registered SSH key.
-  admin_cidr    = "130.185.117.126/32"   # laptop's current IP from curl -4 ifconfig.me
+  firewall_id   = module.headscale_firewall.firewall_id
+}
+
+module "headscale_firewall" {
+  source = "../../../modules/headscale-firewall"
 }
   
 module "k8s_control_plane" {
