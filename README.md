@@ -25,4 +25,34 @@ The project aims to deliver a production-grade reference implementation of Kuber
 
 ## Repository Layout
 
+## Modules created
+
+- core-network: Hetzner private network (10.0.0.0/16).
+- hcloud-firewall: Baseline firewall for Kubernetes nodes (SSH + intra-cluster only).
+- k8s-control-plane: CP node with static private IP (10.0.0.10).
+- k8s-node: Worker nodes (auto IP).
+- headscale-server: Dedicated CX22 with minimal firewall (SSH, HTTPS 443, STUN 3478).
+
+## Secrets + automation
+
+- load-secrets.sh script decrypts Hetzner API token and runs tofu plan / apply.
+- Added APPLY=true option and ability to target modules.
+
+## First apply
+
+- Headscale server provisioned successfully (SSH verified).
+- CP + Workers initially failed because no subnet existed.
+
+## Fix applied
+
+- Added hcloud_network_subnet (10.0.0.0/24) to core-network so servers can attach.
+- Now plan includes proper network + subnet before attaching servers.
+
+# Aliases
+
+- build-infra: create everything.
+- plan-destroy / apply-destroy: target only servers (safe reset).
+- destroy-infra: nuke everything (network, firewalls, servers).
+
+
 
