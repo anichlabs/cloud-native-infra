@@ -22,8 +22,9 @@ The project aims to deliver a production-grade reference implementation of Kuber
 - **Security-first:** least privilege, encryption, scanning, and runtime detection  
 - **GitOps:** declarative management with continuous reconciliation  
 - **Modularity:** easily replace or extend components
+// ## Repository Layout
 
-## Repository Layout
+# Infrastructure so far:
 
 ## Modules created
 
