@@ -30,5 +30,11 @@ tofu init -input=false
 echo "→ Running plan..."
 tofu plan -out=tfplan "$@"
 
-echo "✔ Plan complete. Review with: tofu show tfplan"
-echo "⚠ To apply manually, run: tofu apply tfplan"
+# 5. Apply if APPLY=true is set
+if [[ "${APPLY:-false}" == "true" ]]; then
+  echo "→ Applying changes..."
+  tofu apply -input=false tfplan
+else
+  echo "✔ Plan complete. Review with: tofu show tfplan"
+  echo "⚠ To apply manually, run: tofu apply tfplan"
+fi
