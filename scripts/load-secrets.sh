@@ -15,18 +15,20 @@ HETZNER_TOKEN="$(SOPS_AGE_KEY_FILE="$HOME/.secrets/age.key" \
 export HCLOUD_TOKEN="$HETZNER_TOKEN"
 echo "HCLOUD_TOKEN is set: ****…"
 
-# 3. Init and Plan
+# 3. Detect current public IPv4 and inject as admin_cidr
+MYIP=$(curl -s -4 ifconfig.co || true)
+if [[ -z "$MYIP" ]]; then
+  echo "✖ Failed to detect public IP (curl ifconfig.co). Aborting for safety."
+  exit 1
+fi
+export TF_VAR_admin_cidr="${MYIP}/32"
+echo "→ Using admin_cidr = ${TF_VAR_admin_cidr}"
+
+# 4. Init and Plan
 echo "→ Initializing OpenTofu..."
 tofu init -input=false
 echo "→ Running plan..."
 tofu plan -out=tfplan "$@"
 
-# 4. Apply if environment variable APPLY=true
-if [[ "${APPLY:-false}" == "true" ]]; then
-  echo "→ Applying..."
-  tofu apply -auto-approve "$@" tfplan
-  rm -f tfplan
-  echo "✅ Apply complete! (tfplan removed)"
-else
-  echo "→ Plan created: tfplan. Use APPLY=true load-secrets.sh to apply."
-fi
+echo "✔ Plan complete. Review with: tofu show tfplan"
+echo "⚠ To apply manually, run: tofu apply tfplan"

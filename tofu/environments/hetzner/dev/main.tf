@@ -19,7 +19,7 @@ module "core_network" {
 
 module "hcloud_firewall" {
   source       = "../../../modules/hcloud-firewall"
-  admin_cidr   = "130.185.117.126/32"
+  admin_cidr   = var.admin_cidr
   cluster_cidr = "10.0.0.0/16"
 }  
 
