@@ -42,12 +42,3 @@ module "k8s_nodes" {
   worker_count  = 2
   firewall_id   = module.hcloud_firewall.firewall_id
 }
-
-
-output "control_plane_ip" {
-  value = module.k8s_control_plane.ip
-}
-
-output "worker_ips" {
-  value = module.k8s_nodes.ips
-}  
