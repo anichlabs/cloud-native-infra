@@ -42,3 +42,33 @@ module "k8s_nodes" {
   worker_count  = 2
   firewall_id   = module.hcloud_firewall.firewall_id
 }
+
+
+// MinIO / Backup Vault server (CX22)
+// Purpose: encrypted object storage for Terraform state, configs, ML checkpoints.
+// Notes: GDPR/AI Act compliance; no personal data, only infra/state artifacts.
+
+module "minio_vault" {
+  source = "../../../modules/hcloud-server"
+
+  name         = "minio-vault-dev-1"
+  server_type  = "cx22"
+  image        = "ubuntu-24.04"
+  region       = "fsn1"
+
+  network_id   = module.core_network.network_id
+  private_ip   = "10.0.1.20" // Choose next free IP in the network range.
+  firewall_id  = module.core_network.network_id
+
+  ssh_key_name = "tuxedo-ed25519"
+
+  labels = {
+    role    = "minio-backup-vault"
+    env     = "dev"
+    gdpr    = "no-personal-data"
+    ai_act  = "compliant"
+  }
+
+  // Cloud-init will later bootstrap MinIO: keep null for now.
+  user_data = null 
+}
