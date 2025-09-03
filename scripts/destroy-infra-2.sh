@@ -2,44 +2,33 @@
 set -euo pipefail
 trap 'echo "✖ Error on line $LINENO"; exit 1' ERR
 
-# 1. Set environment and root directory
+# Usage: ./destroy-infra.sh [environment]
 ENV="${1:-dev}"
-shift || true
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../tofu/environments/hetzner/${ENV}" && pwd)"
 cd "$ROOT"
 
-# 2. Decrypt the Hetzner API token using SOPS and age
 echo "→ Decrypting secrets..."
 export HCLOUD_TOKEN="$(SOPS_AGE_KEY_FILE="$HOME/.secrets/age.key" \
   sops --decrypt --extract '["hcloud_token"]' hetzner.enc.yaml)"
 echo "HCLOUD_TOKEN is set: ****…"
 
-# 3. Detect current public IPv4 and inject as admin_cidr
+# Detect current public IP
 MYIP=$(curl -s -4 ifconfig.co || true)
 if [[ -z "$MYIP" ]]; then
-  echo "⚠ Could not detect public IP. Falling back to 0.0.0.0/0"
+  echo "✖ Failed to detect public IP (curl ifconfig.co)."
+  echo "   Falling back to 0.0.0.0/0 (open access)."
   export TF_VAR_admin_cidr="0.0.0.0/0"
 else
   export TF_VAR_admin_cidr="${MYIP}/32"
 fi
 echo "→ Using admin_cidr = ${TF_VAR_admin_cidr}"
 
-# 4. Set NetBird VPN subnet (static for now, can be made dynamic later)
+# Set NetBird VPN subnet (static for now)
 export TF_VAR_vpn_cidr="100.64.0.0/10"
 echo "→ Using vpn_cidr = ${TF_VAR_vpn_cidr}"
 
-# 5. Init and Plan
 echo "→ Initializing OpenTofu..."
 tofu init -input=false
 
-echo "→ Running plan..."
-tofu plan -out=tfplan "$@"
-
-# 6. Apply if APPLY=true is set
-if [[ "${APPLY:-false}" == "true" ]]; then
-  echo "→ Applying changes..."
-  tofu apply -input=false -auto-approve tfplan
-else
-  echo "✔ Plan complete. Review with: tofu show tfplan"
-  echo "⚠ To apply manually, run: tofu apply tfplan"
-fi
+echo "⚠ You are about to destroy infrastructure in environment: ${ENV}"
+tofu destroy -auto-approve -input=false

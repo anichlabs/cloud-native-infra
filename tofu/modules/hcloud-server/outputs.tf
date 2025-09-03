@@ -24,8 +24,9 @@ output "ipv6_address" {
 
 output "private_network_ip" {
   description = "Private IPv4 address inside the attached network"
-  value       = try(hcloud_server.this.network[0].ip, null)
+  value       = try(one(hcloud_server.this.network).ip, null)
 }
+
 
 output "labels" {
   description  = "Labels applied to the server"

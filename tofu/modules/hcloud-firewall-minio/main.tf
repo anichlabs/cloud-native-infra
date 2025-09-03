@@ -2,7 +2,7 @@
 // Purpose: firewall for MinIO / Backup Vault server.
 // GDPR/AI Act: principle of least privilege (only SSH + VPN traffic).
 
-resource "hcloud-firewall" "this" {
+resource "hcloud_firewall" "this" {
   name = "fw-minio-vault"
 
   // SSH only from the admin workstation / trusted IP
