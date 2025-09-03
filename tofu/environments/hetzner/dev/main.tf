@@ -48,6 +48,12 @@ module "k8s_nodes" {
 // Purpose: encrypted object storage for Terraform state, configs, ML checkpoints.
 // Notes: GDPR/AI Act compliance; no personal data, only infra/state artifacts.
 
+module "hcloud_firewall_minio" {
+  source     = "../../../modules/hcloud-firewall-minio"
+  admin_cidr = var.admin_cidr
+  vpn_cidr   = var.vpn_cidr
+}
+
 module "minio_vault" {
   source = "../../../modules/hcloud-server"
 
@@ -58,8 +64,7 @@ module "minio_vault" {
 
   network_id   = module.core_network.network_id
   private_ip   = "10.0.1.20" // Choose next free IP in the network range.
-  firewall_id  = module.core_network.network_id
-
+  firewall_id  = module.hcloud_firewall_minio.firewall_id
   ssh_key_name = "tuxedo-ed25519"
 
   labels = {
