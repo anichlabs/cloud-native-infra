@@ -1,21 +1,6 @@
 // File: tofu/modules/hcloud-firewall/main.tf
 // Purpose: Baseline firewall for Kubernetes nodes on Hetzner Cloud.
 
-variable "name" {
-  type         = string
-  description  = "Firewall name"
-  default      = "k8s-firewall"
-}
-
-variable "admin_cidr" {
-  type         = string
-  description  = "Admin CIDR allowed for SSH (e.g., 203.0.113.5/32)"
-}
-
-variable "cluster_cidr" {
-  type         = string
-  description  = "Private network CIDR for infra-cluster traffic (e.g., 10.0.0.0/16)"
-}
 
 resource "hcloud_firewall" "this" {
   name         = var.name
@@ -93,9 +78,4 @@ resource "hcloud_firewall" "this" {
     protocol        = "icmp"
     destination_ips = ["0.0.0.0/0", "::/0"]
   }
-}
-
-output "firewall_id" {
-  value       = hcloud_firewall.this.id
-  description = "Firewall ID to attach to servers"
 }
