@@ -2,6 +2,7 @@
 ---
 package_update: true
 package_upgrade: true
+
 packages:
   - wget
   - curl
@@ -20,9 +21,9 @@ write_files:
       [Service]
       User=root
       Group=root
-      Environment="MINIO_ROOT_USER=minioadmin"
-      Environment="MINIO_ROOT_PASSWORD=localtest123"
-      ExecStart=/usr/local/bin/minio server /var/minio         --console-address ":>
+      Environment="MINIO_ROOT_USER=${minio_root_user}"
+      Environment="MINIO_ROOT_PASSWORD=${minio_root_password}"
+      ExecStart=/usr/local/bin/minio server /var/minio --console-address ":9001"
       Restart=always
       LimitNOFILE=65536
 
@@ -30,7 +31,7 @@ write_files:
       WantedBy=multi-user.target
 
 runcmd:
-  - wget -q https://dl.min.io/server/minio/release/linux-amd64/minio       -O /usr/>
+  - wget -q https://dl.min.io/server/minio/release/linux-amd64/minio -O /usr/local/bin/minio
   - chmod +x /usr/local/bin/minio
   - mkdir -p /var/minio
   - chown -R root:root /var/minio

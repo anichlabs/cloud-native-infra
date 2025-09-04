@@ -74,8 +74,11 @@ module "minio_vault" {
     ai_act  = "compliant"
   }
 
-  user_data = templatefile("../../../modules/hcloud-server/cloud-init/minio.yaml", {
+  user_data = templatefile(
+  "${path.module}/../../../modules/hcloud-server/cloud-init/minio.yaml.tftpl",
+  {
     minio_root_user     = var.minio_root_user
     minio_root_password = var.minio_root_password
-  })
+  }
+ )
 }
