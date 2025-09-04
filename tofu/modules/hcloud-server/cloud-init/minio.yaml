@@ -1,0 +1,39 @@
+#cloud-config
+---
+package_update: true
+package_upgrade: true
+packages:
+  - wget
+  - curl
+  - unzip
+
+write_files:
+  - path: /etc/systemd/system/minio.service
+    permissions: "0644"
+    content: |
+      [Unit]
+      Description=MinIO
+      Documentation=https://docs.min.io/community/minio-object-store/index.html
+      Wants=network-online.target
+      After=network-online.target
+
+      [Service]
+      User=root
+      Group=root
+      Environment="MINIO_ROOT_USER=minioadmin"
+      Environment="MINIO_ROOT_PASSWORD=localtest123"
+      ExecStart=/usr/local/bin/minio server /var/minio         --console-address ":>
+      Restart=always
+      LimitNOFILE=65536
+
+      [Install]
+      WantedBy=multi-user.target
+
+runcmd:
+  - wget -q https://dl.min.io/server/minio/release/linux-amd64/minio       -O /usr/>
+  - chmod +x /usr/local/bin/minio
+  - mkdir -p /var/minio
+  - chown -R root:root /var/minio
+  - systemctl daemon-reload
+  - systemctl enable minio
+  - systemctl start minio

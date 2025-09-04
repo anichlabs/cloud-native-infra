@@ -10,3 +10,15 @@ NetBird VPN subnet range (CIDR).
 Supplied dynamically by build-infra.sh via TF_VAR_vpn_cidr.
 EOT
 }
+
+// Minio Variables for hcloud-server module
+variable "minio_root_user" {
+  type        = string
+  description = "Root username for MinIO (decrypted via SOPS at runtime)."
+}
+
+variable "minio_root_password" {
+  type        = string
+  description = "Root password for MinIO (decrypted via SOPS at runtime)."
+  sensitive   = true
+}

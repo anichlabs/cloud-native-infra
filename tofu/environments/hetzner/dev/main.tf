@@ -74,6 +74,8 @@ module "minio_vault" {
     ai_act  = "compliant"
   }
 
-  // Cloud-init will later bootstrap MinIO: keep null for now.
-  user_data = null 
+  user_data = templatefile("../../../modules/hcloud-server/cloud-init/minio.yaml", {
+    minio_root_user     = var.minio_root_user
+    minio_root_password = var.minio_root_password
+  })
 }

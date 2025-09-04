@@ -7,3 +7,4 @@ variable "network_cidr" {
   type        = string
   description = "CIDR for the private network"
 }
+

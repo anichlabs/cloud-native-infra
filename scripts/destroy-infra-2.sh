@@ -12,6 +12,14 @@ export HCLOUD_TOKEN="$(SOPS_AGE_KEY_FILE="$HOME/.secrets/age.key" \
   sops --decrypt --extract '["hcloud_token"]' hetzner.enc.yaml)"
 echo "HCLOUD_TOKEN is set: ****…"
 
+# Decrypt MinIO credentials (required by variables.tf)
+export TF_VAR_minio_root_user="$(SOPS_AGE_KEY_FILE="$HOME/.secrets/age.key" \
+  sops --decrypt --extract '["minio_root_user"]' hetzner.enc.yaml)"
+export TF_VAR_minio_root_password="$(SOPS_AGE_KEY_FILE="$HOME/.secrets/age.key" \
+  sops --decrypt --extract '["minio_root_password"]' hetzner.enc.yaml)"
+echo "MINIO_ROOT_USER is set: ${TF_VAR_minio_root_user}"
+echo "MINIO_ROOT_PASSWORD is set: ****…"
+
 # Detect current public IP
 MYIP=$(curl -s -4 ifconfig.co || true)
 if [[ -z "$MYIP" ]]; then
