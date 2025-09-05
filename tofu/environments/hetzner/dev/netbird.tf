@@ -3,7 +3,8 @@
 // GDPR/AI Act: EU-hosted (Hetzner DE). Keep secrets out of state.
 
 resource "hcloud_firewall" "netbird" {
-  name = "fw-netbird-controller"
+  count = var.enable_netbird ? 1 : 0
+  name  = "fw-netbird-controller"
 
   // Inbound
   rule {
@@ -118,6 +119,7 @@ resource "hcloud_firewall" "netbird" {
 }
 
 module "netbird_controller" {
+  count       = var.enable_netbird ? 1 : 0
   source      = "../../../modules/hcloud-server"
   name        = "netbird-controller-dev-1"
   server_type = "cx22"
@@ -127,7 +129,7 @@ module "netbird_controller" {
   ssh_key_name = "tuxedo-ed25519"
   network_id   = module.core_network.network_id
   private_ip   = "10.0.0.10"
-  firewall_id  = hcloud_firewall.netbird.id
+  firewall_id  = hcloud_firewall.netbird[0].id
 
   user_data = templatefile(
     "${path.module}/../../../modules/hcloud-server/cloud-init/netbird-nginx.yaml.tftpl",

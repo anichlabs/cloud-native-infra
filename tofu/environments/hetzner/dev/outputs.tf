@@ -74,17 +74,17 @@ output "minio_console_url" {
 // Public IPv4
 output "netbird_public_ipv4" {
   description = "NetBird controller public IPv4"
-  value       = module.netbird_controller.public_ipv4
+  value       = var.enable_netbird && length(module.netbird_controller) > 0 ? module.netbird_controller[0].ipv4_address : null
 }
 
 // Public IPv6 (if enabled)
 output "netbird_public_ipv6" {
   description = "NetBird controller public IPv6"
-  value       = module.netbird_controller.public_ipv6
+  value       = var.enable_netbird && length(module.netbird_controller) > 0 ? module.netbird_controller[0].ipv6_address : null
 }
 
 // Private IP (VPC address)
 output "netbird_private_ip" {
   description = "NetBird controller private IP in 10.0.0.0/24"
-  value       = module.netbird_controller.private_ip
+  value       = var.enable_netbird && length(module.netbird_controller) > 0 ? module.netbird_controller[0].private_network_ip : null
 }

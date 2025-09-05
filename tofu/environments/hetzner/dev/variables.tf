@@ -29,3 +29,10 @@ variable "minio_volume_size" {
   description = "Size (GiB) for MinIO persistent volume"
   default     = 100
 }
+
+// Add the safety flag (location + snippet)
+variable "enable_netbird" {
+  description = "Create NetBird controller + firewall when true (repo safety gate)"
+  type        = bool
+  default     = false
+}
