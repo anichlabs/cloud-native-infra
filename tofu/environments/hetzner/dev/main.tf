@@ -43,7 +43,6 @@ module "k8s_nodes" {
   firewall_id   = module.hcloud_firewall.firewall_id
 }
 
-
 // MinIO / Backup Vault server (CX22)
 // Purpose: encrypted object storage for Terraform state, configs, ML checkpoints.
 // Notes: GDPR/AI Act compliance; no personal data, only infra/state artifacts.

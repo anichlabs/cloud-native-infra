@@ -8,8 +8,17 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../tofu/environments/hetzner/${ENV}" 
 cd "$ROOT"
 
 echo "→ Decrypting secrets..."
-export HCLOUD_TOKEN="$(SOPS_AGE_KEY_FILE="$HOME/.secrets/age.key" sops --decrypt --extract '["hcloud_token"]' hetzner.enc.yaml)"
+export HCLOUD_TOKEN="$(SOPS_AGE_KEY_FILE="$HOME/.secrets/age.key" \
+  sops --decrypt --extract '["hcloud_token"]' hetzner.enc.yaml)"
 echo "HCLOUD_TOKEN is set: ****…"
+
+# Decrypt MinIO credentials (required by variables.tf)
+export TF_VAR_minio_root_user="$(SOPS_AGE_KEY_FILE="$HOME/.secrets/age.key" \
+  sops --decrypt --extract '["minio_root_user"]' hetzner.enc.yaml)"
+export TF_VAR_minio_root_password="$(SOPS_AGE_KEY_FILE="$HOME/.secrets/age.key" \
+  sops --decrypt --extract '["minio_root_password"]' hetzner.enc.yaml)"
+echo "MINIO_ROOT_USER is set: ${TF_VAR_minio_root_user}"
+echo "MINIO_ROOT_PASSWORD is set: ****…"
 
 # Detect current public IP
 MYIP=$(curl -s -4 ifconfig.co || true)
@@ -22,8 +31,12 @@ else
 fi
 echo "→ Using admin_cidr = ${TF_VAR_admin_cidr}"
 
+# Set NetBird VPN subnet (static for now)
+export TF_VAR_vpn_cidr="100.64.0.0/10"
+echo "→ Using vpn_cidr = ${TF_VAR_vpn_cidr}"
+
 echo "→ Initializing OpenTofu..."
 tofu init -input=false
 
-echo "→ Destroying infrastructure..."
+echo "⚠ You are about to destroy infrastructure in environment: ${ENV}"
 tofu destroy -auto-approve -input=false
