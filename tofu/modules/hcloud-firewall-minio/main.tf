@@ -39,6 +39,23 @@ resource "hcloud_firewall" "this" {
     protocol        = "tcp"
     port            = "any"
     destination_ips = ["0.0.0.0/0", "::/0"]
-  } 
+  }
+
+  rule {
+  description     = "Allow MinIO API from Entrypoint"
+  direction       = "in"
+  protocol        = "tcp"
+  port            = "9000"
+  source_ips      = ["10.0.1.0/24"] # adjust to Entrypoint's VPN/private IP range
+  }
+
+  rule {
+    description   =  "Allow MinIO Console from Entrypoint"
+    direction     = "in"
+    protocol      = "tcp"
+    port          = "9001"
+    source_ips    = ["10.0.1.0/24"]
+  }
 }
+
 
