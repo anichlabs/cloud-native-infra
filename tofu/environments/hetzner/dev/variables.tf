@@ -22,3 +22,10 @@ variable "minio_root_password" {
   description = "Root password for MinIO (decrypted via SOPS at runtime)."
   sensitive   = true
 }
+
+// Keep a sensible default; increase later if checkpoints grow.
+variable "minio_volume_size" {
+  type        = number
+  description = "Size (GiB) for MinIO persistent volume"
+  default     = 100
+}
