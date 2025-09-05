@@ -88,3 +88,19 @@ output "netbird_private_ip" {
   description = "NetBird controller private IP in 10.0.0.0/24"
   value       = var.enable_netbird && length(module.netbird_controller) > 0 ? module.netbird_controller[0].private_network_ip : null
 }
+
+# ──────────────────────────────────────────────────────────────
+# Monitoring / Observability outputs
+# Purpose: IPs for Prometheus/Grafana/Loki VM
+# ──────────────────────────────────────────────────────────────
+
+output "monitoring_public_ipv4" {
+  description = "Public IPv4 of Monitoring"
+  value       = module.monitoring.ipv4_address
+}
+
+output "monitoring_private_ipv4" {
+  description = "Private IPv4 of Monitoring"
+  value       = module.monitoring.private_network_ip
+}
+

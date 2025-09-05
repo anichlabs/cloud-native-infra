@@ -1,0 +1,258 @@
+#cloud-config
+package_update: true
+package_upgrade: true
+packages:
+  - docker.io
+  - docker-compose-plugin
+  - nginx
+  - python3-certbot-nginx
+  - jq
+  - ca-certificates
+  - curl
+  - gnupg
+
+write_files:
+  # ---------------------------
+  # Docker Compose stack
+  # ---------------------------
+  - path: /opt/monitoring/docker-compose.yml
+    permissions: "0644"
+    owner: root:root
+    content: |
+      version: "3.8"
+      services:
+        prometheus:
+          image: prom/prometheus:latest
+          restart: unless-stopped
+          command:
+            - "--config.file=/etc/prometheus/prometheus.yml"
+            - "--storage.tsdb.retention.time=15d"
+          volumes:
+            - /opt/monitoring/config/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+            - /opt/monitoring/data/prometheus:/prometheus
+          ports:
+            - "0.0.0.0:9090:9090"
+          networks: [stack]
+
+        grafana:
+          image: grafana/grafana:latest
+          restart: unless-stopped
+          environment:
+            GF_SERVER_ROOT_URL: "https://${monitoring_domain}/grafana"
+            GF_SERVER_SERVE_FROM_SUB_PATH: "true"
+            GF_SECURITY_ADMIN_PASSWORD__FILE: "/opt/monitoring/secrets/grafana-admin-password"
+            GF_AUTH_ANONYMOUS_ENABLED: "false"
+            GF_AUTH_DISABLE_LOGIN_FORM: "false"
+            GF_ANALYTICS_REPORTING_ENABLED: "false"
+            GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+          user: "0"   # allow reading mounted secret file
+          volumes:
+            - /opt/monitoring/data/grafana:/var/lib/grafana
+          ports:
+            - "0.0.0.0:3000:3000"
+          networks: [stack]
+
+        loki:
+          image: grafana/loki:2.9.6
+          restart: unless-stopped
+          command: [ "-config.file=/etc/loki/config.yml" ]
+          volumes:
+            - /opt/monitoring/config/loki-config.yml:/etc/loki/config.yml:ro
+            - /opt/monitoring/data/loki:/loki
+          ports:
+            - "0.0.0.0:3100:3100"
+          networks: [stack]
+
+        promtail:
+          image: grafana/promtail:2.9.6
+          restart: unless-stopped
+          command: [ "-config.file=/etc/promtail/config.yml" ]
+          volumes:
+            - /opt/monitoring/config/promtail-config.yml:/etc/promtail/config.yml:ro
+            - /var/log:/var/log:ro
+            - /var/lib/docker/containers:/var/lib/docker/containers:ro
+          networks: [stack]
+
+      networks:
+        stack:
+          driver: bridge
+
+  # ---------------------------
+  # Prometheus config (drop/replace sensitive labels)
+  # ---------------------------
+  - path: /opt/monitoring/config/prometheus.yml
+    permissions: "0644"
+    owner: root:root
+    content: |
+      global:
+        scrape_interval: 30s
+        evaluation_interval: 30s
+
+      scrape_configs:
+        - job_name: 'node'
+          static_configs:
+            - targets: ['localhost:9100']
+          relabel_configs:
+            # Replace instance label with a generic token (avoid IP/hostname leak)
+            - target_label: instance
+              replacement: "scrape_target"
+          metric_relabel_configs:
+            # Drop highly identifying labels if present
+            - action: labeldrop
+              regex: "(pod_ip|__meta_kubernetes_pod_ip|remote_addr|client_ip)"
+
+  # ---------------------------
+  # Loki config (standard single process)
+  # ---------------------------
+  - path: /opt/monitoring/config/loki-config.yml
+    permissions: "0644"
+    owner: root:root
+    content: |
+      server:
+        http_listen_port: 3100
+      common:
+        instance_addr: 127.0.0.1
+        path_prefix: /loki
+        storage:
+          filesystem:
+            chunks_directory: /loki/chunks
+            rules_directory: /loki/rules
+        replication_factor: 1
+        ring:
+          kvstore:
+            store: inmemory
+      schema_config:
+        configs:
+          - from: 2024-01-01
+            store: tsdb
+            object_store: filesystem
+            schema: v13
+            index:
+              prefix: index_
+              period: 24h
+      ruler:
+        alertmanager_url: http://localhost:9093
+
+  # ---------------------------
+  # Promtail config with privacy filters (scrub IPs)
+  # ---------------------------
+  - path: /opt/monitoring/config/promtail-config.yml
+    permissions: "0644"
+    owner: root:root
+    content: |
+      server:
+        http_listen_port: 9080
+        grpc_listen_port: 0
+
+      clients:
+        - url: http://127.0.0.1:3100/loki/api/v1/push
+
+      positions:
+        filename: /tmp/positions.yaml
+
+      scrape_configs:
+        - job_name: system
+          static_configs:
+            - targets: [localhost]
+              labels:
+                job: varlogs
+                __path__: /var/log/*.log
+          pipeline_stages:
+            # redact IPv4 addresses
+            - replace:
+                expression: '(?P<ip>(?:\\d{1,3}\\.){3}\\d{1,3})'
+                replace: '0.0.0.0'
+                source: message
+            # redact IPv6 addresses
+            - replace:
+                expression: '([A-Fa-f0-9]{0,4}:){2,7}[A-Fa-f0-9]{0,4}'
+                replace: '::'
+                source: message
+            # drop noisy labels if any appear
+            - labeldrop:
+                - "client_ip"
+                - "remote_addr"
+                - "forwarded_for"
+
+  # ---------------------------
+  # NGINX site with anonymised logs
+  # ---------------------------
+  - path: /etc/nginx/sites-available/monitoring.conf
+    permissions: "0644"
+    owner: root:root
+    content: |
+      # Map to anonymise client IPs in logs (IPv4 -> a.b.0.0, IPv6 -> ::)
+      map $remote_addr $anon_ip_v4 {
+        ~^(?<a>\\d+)\\.(?<b>\\d+)\\.\\d+\\.\\d+$  "$a.$b.0.0";
+        default                                  "0.0.0.0";
+      }
+      map $remote_addr $anon_ip_v6 {
+        ~: "::";
+        default $remote_addr;
+      }
+      map $remote_addr $anon_ip {
+        ~:           $anon_ip_v6;
+        default:     $anon_ip_v4;
+      }
+      log_format privacy '$anon_ip - $request "$status" $body_bytes_sent "$http_referer" "$http_user_agent"';
+
+      server {
+        listen 80;
+        server_name ${monitoring_domain};
+        access_log /var/log/nginx/monitoring_access.log privacy;
+        error_log  /var/log/nginx/monitoring_error.log;
+        location / { return 301 https://$host$request_uri; }
+      }
+
+      server {
+        listen 443 ssl http2;
+        server_name ${monitoring_domain};
+        access_log /var/log/nginx/monitoring_access.log privacy;
+        error_log  /var/log/nginx/monitoring_error.log;
+
+        ssl_certificate     /etc/letsencrypt/live/${monitoring_domain}/fullchain.pem;
+        ssl_certificate_key /etc/letsencrypt/live/${monitoring_domain}/privkey.pem;
+
+        # Grafana under /grafana
+        location /grafana/ {
+          proxy_set_header Host $host;
+          proxy_set_header X-Forwarded-Proto $scheme;
+          proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+          proxy_pass http://127.0.0.1:3000/;
+        }
+
+        # Prometheus under /prometheus
+        location /prometheus/ {
+          proxy_set_header Host $host;
+          proxy_pass http://127.0.0.1:9090/;
+        }
+
+        # Loki (read API) under /loki
+        location /loki/ {
+          proxy_set_header Host $host;
+          proxy_pass http://127.0.0.1:3100/;
+        }
+      }
+
+runcmd:
+  # Docker
+  - systemctl enable docker
+  - systemctl start docker
+  - mkdir -p /opt/monitoring/config /opt/monitoring/data/{grafana,prometheus,loki} /opt/monitoring/secrets
+
+  # One-time Grafana admin password (never enters TF state)
+  - if [ ! -s /opt/monitoring/secrets/grafana-admin-password ]; then openssl rand -base64 18 > /opt/monitoring/secrets/grafana-admin-password; chmod 600 /opt/monitoring/secrets/grafana-admin-password; fi
+  - echo "Grafana admin password stored in /opt/monitoring/secrets/grafana-admin-password" > /root/monitoring-credentials.txt
+  - chmod 600 /root/monitoring-credentials.txt
+
+  # Enable NGINX site
+  - ln -sf /etc/nginx/sites-available/monitoring.conf /etc/nginx/sites-enabled/monitoring.conf
+  - nginx -t || (cat /etc/nginx/nginx.conf && exit 1)
+  - systemctl restart nginx
+
+  # Obtain cert (will also write NGINX ssl paths)
+  - certbot --nginx -d ${monitoring_domain} --non-interactive --agree-tos -m ${letsencrypt_email} --redirect || true
+  - systemctl reload nginx || true
+
+  # Bring up stack
+  - docker compose -f /opt/monitoring/docker-compose.yml up -d
