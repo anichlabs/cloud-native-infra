@@ -14,7 +14,7 @@ write_files:
     content: |
       [Unit]
       Description=MinIO
-      Documentation=https://docs.min.io/community/minio-object-store/index.html
+      Documentation=https://docs.min.io/
       Wants=network-online.target
       After=network-online.target
 
@@ -31,10 +31,37 @@ write_files:
       WantedBy=multi-user.target
 
 runcmd:
+  # Download MinIO binary
   - wget -q https://dl.min.io/server/minio/release/linux-amd64/minio -O /usr/local/bin/minio
   - chmod +x /usr/local/bin/minio
-  - mkdir -p /var/minio
-  - chown -R root:root /var/minio
+
+  # Prepare and mount Hetzner Volume
+  - |
+    DEVICE="/dev/disk/by-id/scsi-0HC_Volume_minio-data-dev"
+    MOUNTPOINT="/var/minio"
+
+    # Wait for device to appear
+    for i in {1..30}; do
+      [ -e "$DEVICE" ] && break
+      sleep 2
+    done
+
+    # Format only if no filesystem exists
+    if ! blkid "$DEVICE"; then
+      mkfs.ext4 -F "$DEVICE"
+    fi
+
+    mkdir -p "$MOUNTPOINT"
+
+    # Add to fstab if not already present
+    if ! grep -q "$DEVICE" /etc/fstab; then
+      echo "$DEVICE $MOUNTPOINT ext4 defaults,nofail 0 2" >> /etc/fstab
+    fi
+
+    mount -a
+    chown -R root:root "$MOUNTPOINT"
+
+  # Enable and start MinIO service
   - systemctl daemon-reload
   - systemctl enable minio
-  - systemctl start minio
+  - systemctl restart minio
