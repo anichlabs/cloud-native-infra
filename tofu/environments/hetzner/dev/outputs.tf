@@ -66,3 +66,25 @@ output "minio_console_url" {
   description = "MinIO Console HTTPS endpoint"
   value       = "https://minio-console.dev.anichlabs.com"
 }
+
+// ───────────────────────────
+// NetBird Controller Outputs
+// ───────────────────────────
+
+// Public IPv4
+output "netbird_public_ipv4" {
+  description = "NetBird controller public IPv4"
+  value       = module.netbird_controller.public_ipv4
+}
+
+// Public IPv6 (if enabled)
+output "netbird_public_ipv6" {
+  description = "NetBird controller public IPv6"
+  value       = module.netbird_controller.public_ipv6
+}
+
+// Private IP (VPC address)
+output "netbird_private_ip" {
+  description = "NetBird controller private IP in 10.0.0.0/24"
+  value       = module.netbird_controller.private_ip
+}

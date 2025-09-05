@@ -32,3 +32,19 @@ output "labels" {
   description  = "Labels applied to the server"
   value        = hcloud_server.this.labels
 }
+
+// Aliases to match environment expectations
+output "public_ipv4" {
+  description = "Alias of ipv4_address for compatibility"
+  value       = hcloud_server.this.ipv4_address
+}
+
+output "public_ipv6" {
+  description = "Alias of ipv6_address for compatibility"
+  value       = hcloud_server.this.ipv6_address
+}
+
+output "private_ip" {
+  description = "Alias of private_network_ip for compatibility"
+  value       = try(one(hcloud_server.this.network).ip, null)
+}

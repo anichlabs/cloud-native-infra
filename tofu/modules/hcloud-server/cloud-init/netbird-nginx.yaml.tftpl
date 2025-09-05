@@ -1,0 +1,135 @@
+#cloud-config
+package_update: true
+package_upgrade: true
+packages:
+  - docker.io
+  - docker-compose
+  - nginx
+  - python3-certbot-nginx
+  - ufw
+
+runcmd:
+  # Enable + start Docker
+  - systemctl enable docker
+  - systemctl start docker
+
+  # Create NetBird Docker Compose directory
+  - mkdir -p /opt/netbird
+  - |
+    cat > /opt/netbird/docker-compose.yml <<'EOF'
+    version: "3.8"
+    services:
+      management:
+        image: netbirdio/management:latest
+        restart: always
+        environment:
+          NETBIRD_DOMAIN: "${netbird_domain}"
+          # OIDC placeholders (inject via SOPS later)
+          NETBIRD_OIDC_CLIENT_ID: "${oidc_client_id}"
+          NETBIRD_OIDC_CLIENT_SECRET: "${oidc_client_secret}"
+          NETBIRD_OIDC_ISSUER: "${oidc_issuer_url}"
+        ports:
+          - "33073:33073"
+        networks: [netbird]
+
+      signal:
+        image: netbirdio/signal:latest
+        restart: always
+        ports:
+          - "10000:10000"
+        networks: [netbird]
+
+      dashboard:
+        image: netbirdio/dashboard:latest
+        restart: always
+        environment:
+          NETBIRD_MGMT_API_ENDPOINT: "https://${netbird_domain}/api"
+        # Expose dashboard on host 8080 so host NGINX can proxy to it safely
+        ports:
+          - "8080:80"
+        networks: [netbird]
+
+      coturn:
+        image: instrumentisto/coturn:latest
+        restart: always
+        ports:
+          - "3478:3478/udp"
+          - "${turn_udp_min_port}-${turn_udp_max_port}:${turn_udp_min_port}-${turn_udp_max_port}/udp"
+        command:
+          - -n
+          - --no-auth
+          - --realm=${netbird_domain}
+          - --listening-port=3478
+          - --min-port=${turn_udp_min_port}
+          - --max-port=${turn_udp_max_port}
+        networks: [netbird]
+
+    networks:
+      netbird:
+        driver: bridge
+    EOF
+
+  # Launch NetBird stack
+  - docker-compose -f /opt/netbird/docker-compose.yml up -d
+
+  # Configure NGINX reverse proxy (HTTP->HTTPS redirect + TLS + gRPC)
+  - |
+    cat > /etc/nginx/sites-available/netbird.conf <<'EOF'
+    server {
+      listen 80;
+      server_name ${netbird_domain};
+      location / {
+        return 301 https://$host$request_uri;
+      }
+    }
+
+    server {
+      listen 443 ssl http2;
+      server_name ${netbird_domain};
+
+      ssl_certificate     /etc/letsencrypt/live/${netbird_domain}/fullchain.pem;
+      ssl_certificate_key /etc/letsencrypt/live/${netbird_domain}/privkey.pem;
+
+      # Dashboard (HTTP proxy to host-mapped container port 8080)
+      location / {
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_http_version 1.1;
+        proxy_pass http://127.0.0.1:8080;
+      }
+
+      # Management (HTTP API)
+      location /api {
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_http_version 1.1;
+        proxy_pass http://127.0.0.1:33073;
+      }
+
+      # Management (gRPC)
+      location /management.ManagementService/ {
+        grpc_pass grpc://127.0.0.1:33073;
+        grpc_read_timeout 300s;
+        grpc_send_timeout 300s;
+      }
+
+      # Signal (gRPC)
+      location /signalexchange.SignalExchange/ {
+        grpc_pass grpc://127.0.0.1:10000;
+        grpc_read_timeout 300s;
+        grpc_send_timeout 300s;
+      }
+    }
+    EOF
+
+  - ln -sf /etc/nginx/sites-available/netbird.conf /etc/nginx/sites-enabled/netbird.conf
+  - nginx -t || (journalctl -u nginx --no-pager -n 200 && false)
+  - systemctl restart nginx
+
+  # Obtain TLS cert via Let's Encrypt (requires DNS A/AAAA ready)
+  - certbot --nginx -d ${netbird_domain} --non-interactive --agree-tos -m ${letsencrypt_email}
+  - systemctl reload nginx
