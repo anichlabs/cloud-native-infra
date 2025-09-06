@@ -1,6 +1,6 @@
 // tofu/modules/hcloud-cicd-node/main.tf
 // Purpose: provision a minimal CI/CD node with strict ingress and EU residency.
-// Notes: map var.region -> Hetzner location; keep inbound closed except SSH and optional NetBird.
+// Notes: pass var.region into the required 'location' field; keep inbound closed except SSH and optional NetBird.
 
 locals {
   labels = merge(var.labels, {
@@ -60,21 +60,24 @@ resource "hcloud_server" "this" {
   name        = var.name
   image       = var.image
   server_type = var.server_type
-  region    = var.region                // Use 'region' variable; Hetzner expects a location code.
+  location    = var.region              // Map your 'region' variable to the required 'location' argument.
   labels      = local.labels
   ssh_keys    = var.ssh_key_ids
 
   backups           = var.enable_backups
   delete_protection = var.delete_protection
 
-  // Public networking toggles (keep IPv4 for outbound unless a NAT gateway exists).
+  // Public networking toggles: use *_enabled booleans (not Primary IP IDs).
   public_net {
-    ipv4 = var.enable_public_ipv4
-    ipv6 = var.enable_ipv6
+    ipv4_enabled = var.enable_public_ipv4
+    ipv6_enabled = var.enable_ipv6
   }
 
-  // Cloud-init will be added in a later step (templatefile); keep null for now.
-  user_data = null
+  // Cloud-init: render template with selected runtime and user (no secrets here).
+  user_data = templatefile("${path.module}/cloud-init/cicd.yaml.tmpl", {
+    container_runtime = var.container_runtime
+    user              = var.user
+  })
 
   // Attach firewall.
   firewall_ids = [hcloud_firewall.this.id]
