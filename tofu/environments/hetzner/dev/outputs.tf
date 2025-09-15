@@ -13,14 +13,28 @@ output "network_ip_range" {
   value       = module.core_network.network_ip_range
 }
 
+# ──────────────────────────────────────────────────────────────
+# Kubernetes worker nodes
+# ──────────────────────────────────────────────────────────────
+
 output "control_plane_ip" {
   description = "Private IPv4 of Kubernetes control plane"
-  value       = module.k8s_control_plane.ip
+  value       = module.k8s_control_plane.private_ip
+}
+
+output "control_plane_public_ip" {
+  description = "Public IPv4 of Kubernetes control plane"
+  value       = module.k8s_control_plane.public_ip
 }
 
 output "worker_ips" {
   description = "Private IPv4 addresses of Kubernetes workers"
   value       = module.k8s_nodes.ips
+}
+
+output "worker_public_ips" {
+  description = "Public IPv4 addresses of Kubernetes workers"
+  value       = module.k8s_nodes.public_ips
 }
 
 # ──────────────────────────────────────────────────────────────
