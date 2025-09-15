@@ -1,0 +1,51 @@
+#cloud-config
+package_update: true
+package_upgrade: false
+
+# Install minimal, auditable tooling. Do not fetch or store secrets here.
+packages:
+  - git
+  - curl
+  - jq
+  - unzip
+  - age
+  - sops
+  - bash-completion
+
+write_files:
+  # Export a Docker-compatible socket only when using Podman (rootless, least privilege).
+  - path: /etc/profile.d/docker_host.sh
+    permissions: '0644'
+    content: |
+      # Configure Docker-compatible CLI endpoint when container_runtime = podman
+      if [ "${container_runtime}" = "podman" ]; then
+        export DOCKER_HOST=unix:///run/podman/podman.sock
+      fi
+
+  # Create a locked workspace for future bootstrap artefacts (tokens will NOT be stored here).
+  - path: /srv/cicd/bootstrap/.keep
+    permissions: '0600'
+    owner: root:root
+    content: "placeholder"
+
+runcmd:
+  - [ bash, -lc, 'set -euo pipefail' ]
+
+  # Install the selected container runtime. Prefer Podman for rootless operation.
+  - [ bash, -lc, 'if [ "${container_runtime}" = "podman" ]; then
+        apt-get install -y podman &&
+        systemctl enable --now podman.socket &&
+        loginctl enable-linger ${user} || true;
+      else
+        apt-get install -y docker.io &&
+        systemctl enable --now docker;
+      fi' ]
+
+  # Create guarded directories (0700) for later runner/Flux bootstrap. Do not start services yet.
+  - [ bash, -lc, 'install -d -m 0700 -o root -g root /srv/cicd && install -d -m 0700 /srv/cicd/bootstrap' ]
+
+  # Reduce log retention by default (privacy). Keep journald bounded and short.
+  - [ bash, -lc, 'mkdir -p /etc/systemd/journald.conf.d &&
+        printf "[Journal]\nSystemMaxUse=200M\nRuntimeMaxUse=100M\nMaxRetentionSec=7day\n" > /etc/systemd/journald.conf.d/99-privacy.conf &&
+        systemctl restart systemd-journald' ]
+CLOUD
