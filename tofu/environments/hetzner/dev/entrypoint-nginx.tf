@@ -26,7 +26,9 @@ module "tls_entrypoint" {
 
   user_data = templatefile(
     "${path.module}/../../../modules/hcloud-server/cloud-init/entrypoint-nginx.yaml.tftpl",
-    {}
+    {
+      acme_email = data.sops_file.hetzner.data["acme_email"]
+    }
   )
 }
 

@@ -2,24 +2,23 @@
 set -euo pipefail
 trap 'echo "✖ Error on line $LINENO"; exit 1' ERR
 
+# 0. Ensure SOPS key is available globally (Terraform + manual decrypts)
+export SOPS_AGE_KEY_FILE="$HOME/.secrets/age.key"
+
 # 1. Set environment and root directory
 ENV="${1:-dev}"
 shift || true
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../tofu/environments/hetzner/${ENV}" && pwd)"
 cd "$ROOT"
 
-# 2. Decrypt the Hetzner API token using SOPS and age
+# 2. Decrypt the Hetzner API token using SOPS
 echo "→ Decrypting secrets..."
-export HCLOUD_TOKEN="$(SOPS_AGE_KEY_FILE="$HOME/.secrets/age.key" \
-  sops --decrypt --extract '["hcloud_token"]' hetzner.enc.yaml)"
+export HCLOUD_TOKEN="$(sops --decrypt --extract '["hcloud_token"]' hetzner.enc.yaml)"
 echo "HCLOUD_TOKEN is set: ****…"
 
-# 2b. Decrypt MinIO root credentials using SOPS and age
-export TF_VAR_minio_root_user="$(SOPS_AGE_KEY_FILE="$HOME/.secrets/age.key" \
-  sops --decrypt --extract '["minio_root_user"]' hetzner.enc.yaml)"
-
-export TF_VAR_minio_root_password="$(SOPS_AGE_KEY_FILE="$HOME/.secrets/age.key" \
-  sops --decrypt --extract '["minio_root_password"]' hetzner.enc.yaml)"
+# 2b. Decrypt MinIO root credentials using SOPS
+export TF_VAR_minio_root_user="$(sops --decrypt --extract '["minio_root_user"]' hetzner.enc.yaml)"
+export TF_VAR_minio_root_password="$(sops --decrypt --extract '["minio_root_password"]' hetzner.enc.yaml)"
 
 echo "MINIO_ROOT_USER is set: ${TF_VAR_minio_root_user}"
 echo "MINIO_ROOT_PASSWORD is set: ****…"  # don’t print the password

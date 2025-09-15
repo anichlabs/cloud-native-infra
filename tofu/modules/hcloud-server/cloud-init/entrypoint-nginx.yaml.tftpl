@@ -13,13 +13,13 @@ write_files:
     permissions: "0644"
     content: |
       server {
-          listen 80:
+          listen 80;
           server_name minio.dev.anichlabs.com minio-console.dev.anichlabs.com;
 
           location / {
               proxy_pass http://10.0.1.20:9000;
               proxy_set_header Host $host;
-              proxy_set_header X-Read-IP $remote_addr;
+              proxy_set_header X-Real-IP $remote_addr;
               proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
           }
 
@@ -33,12 +33,20 @@ write_files:
 
 runcmd:
   # Enable Nginx site
-  - ln s /etc/nginx/sites-available/minio.conf /etc/nginx/sites-enabled/minio.conf
+  - ln -s /etc/nginx/sites-available/minio.conf /etc/nginx/sites-enabled/minio.conf
   - nginx -t
   - systemctl reload nginx
 
+  # Pre-seed ACME email (pulled from SOPS variable)
+  - [ bash, -lc, 'echo "email = ${acme_email}" > /etc/letsencrypt/acme.conf' ]
+
   # Obtain and install Let's Encrypt certs
-  - certbot --nginx -d minio.dev.anichlabs.com -d minio-console.dev.anichlabs.com --non-interactive --agree-tos -m chris@anichlabs.com
+  - certbot --nginx \
+      -d minio.dev.anichlabs.com \
+      -d minio-console.dev.anichlabs.com \
+      --non-interactive \
+      --agree-tos \
+      -m ${acme_email}
 
   # Restart Nginx with certs
   - systemctl restart nginx

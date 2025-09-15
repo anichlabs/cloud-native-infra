@@ -36,3 +36,34 @@ variable "enable_netbird" {
   type        = bool
   default     = false
 }
+
+// --- TLS Entrypoint / public URLs (keep optional for now)
+variable "acme_email" {
+  type        = string
+  description = "Email for ACME/Let's Encrypt certificate registration (GDPR contact)."
+  default     = "chris@anichlabs.com"
+}
+
+variable "forgejo_domain" {
+  type        = string
+  description = "Public domain for Forgejo (e.g. forgejo.dev.anichlabs.com). Leave empty to use public IP."
+  default     = ""
+}
+
+variable "minio_domain" {
+  type        = string
+  description = "Public domain for MinIO API (e.g. minio.dev.anichlabs.com). Leave empty to use IP."
+  default     = ""
+}
+
+variable "minio_console_domain" {
+  type        = string
+  description = "Public domain for MinIO Console (e.g. minio-console.dev.anichlabs.com). Leave empty to use IP."
+  default     = ""
+}
+
+variable "monitoring_domain" {
+  type        = string
+  description = "Public domain for Grafana/Prometheus/Loki (e.g. monitoring.dev.anichlabs.com). Leave empty to use IP."
+  default     = ""
+}

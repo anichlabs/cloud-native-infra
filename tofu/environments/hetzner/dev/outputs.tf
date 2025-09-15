@@ -104,3 +104,18 @@ output "monitoring_private_ipv4" {
   value       = module.monitoring.private_network_ip
 }
 
+// --- Forgejo outputs
+output "forgejo_url" {
+  description = "Forgejo web URL"
+  value       = var.forgejo_domain != "" ? "https://${var.forgejo_domain}" : "http://${module.cicd.public_ipv4}:3000"
+}
+
+output "forgejo_ssh" {
+  description = "Forgejo SSH endpoint"
+  value       = "ssh://git@${module.cicd.public_ipv4}:222"
+}
+
+output "monitoring_url" {
+  description = "Grafana URL"
+  value       = var.monitoring_domain != "" ? "https://${var.monitoring_domain}" : "http://${module.monitoring.public_ipv4}:3000"
+}

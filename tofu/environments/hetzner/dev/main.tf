@@ -4,6 +4,10 @@ terraform {
       source  = "hetznercloud/hcloud"
       version = ">= 1.0.0"
     }
+    sops = {
+      source  = "carlpett/sops"
+      version = ">= 0.7.2"
+    }
   }
 }
 
@@ -80,4 +84,9 @@ module "minio_vault" {
     minio_root_password = var.minio_root_password
   }
  )
+}
+
+# Decrypt all secrets from hetzner.enc.yaml
+data "sops_file" "hetzner" {
+  source_file = "${path.module}/hetzner.enc.yaml"
 }
