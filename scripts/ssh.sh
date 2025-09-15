@@ -1,47 +1,58 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Default environment is dev
-ENV="${ENV:-dev}"
+# Usage: ./ssh.sh [cp|w1|w2|w3...|cicd|minio|monitoring|tls] [env]
+ROLE="${1:-}"
+ENV="${2:-dev}"
+
+if [[ -z "$ROLE" ]]; then
+  echo "Usage: $0 [cp|w1|w2|w3...|cicd|minio|monitoring|tls] [env]"
+  exit 1
+fi
+
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../tofu/environments/hetzner/${ENV}" && pwd)"
 cd "$ROOT"
 
-# Make sure a target is passed
-TARGET="${1:-}"
-if [[ -z "$TARGET" ]]; then
-  echo "Usage: $0 <cp|w1|w2|repo|firezone>"
-  exit 1
-fi
-
-# Fetch outputs from OpenTofu
+# Core cluster IPs
 CP_IP=$(tofu output -raw control_plane_ip 2>/dev/null || true)
 WORKER_IPS=$(tofu output -json worker_ips 2>/dev/null || true)
 
-if [[ -z "$CP_IP" || -z "$WORKER_IPS" ]]; then
-  echo "✖ Could not fetch IPs. Did you run 'tofu apply'?"
-  exit 1
-fi
+# Service node IPs
+CICD_IP=$(tofu output -raw cicd_private_ipv4 2>/dev/null || true)
+MINIO_IP=$(tofu output -raw minio_vault_private_ipv4 2>/dev/null || true)
+MONITORING_IP=$(tofu output -raw monitoring_private_ipv4 2>/dev/null || true)
+TLS_IP=$(tofu output -raw tls_entrypoint_private_ipv4 2>/dev/null || true)
 
-# Map targets to IPs
-case "$TARGET" in
+case "$ROLE" in
   cp)
     HOST="$CP_IP"
     ;;
-  w1)
-    HOST=$(echo "$WORKER_IPS" | jq -r '.[0]')
+  w[0-9]*)
+    INDEX=$(( ${ROLE:1} - 1 ))   # w1 → 0, w2 → 1, etc.
+    HOST=$(echo "$WORKER_IPS" | jq -r ".[$INDEX]" 2>/dev/null || true)
     ;;
-  w2)
-    HOST=$(echo "$WORKER_IPS" | jq -r '.[1]')
+  cicd)
+    HOST="$CICD_IP"
     ;;
-  repo|firezone)
-    echo "✖ Target '$TARGET' not yet defined in outputs. Add it later."
-    exit 1
+  minio)
+    HOST="$MINIO_IP"
+    ;;
+  monitoring)
+    HOST="$MONITORING_IP"
+    ;;
+  tls)
+    HOST="$TLS_IP"
     ;;
   *)
-    echo "✖ Unknown target: $TARGET"
+    echo "✖ Unknown role: $ROLE (expected cp, wN, cicd, minio, monitoring, tls)"
     exit 1
     ;;
 esac
 
-echo "→ Connecting to $TARGET at $HOST ..."
-ssh root@"$HOST"
+if [[ -z "$HOST" || "$HOST" == "null" ]]; then
+  echo "✖ Could not resolve IP for $ROLE in env $ENV. Did you run build-infra.sh?"
+  exit 1
+fi
+
+echo "→ Connecting to $ROLE at $HOST (env: $ENV)"
+exec ssh -o StrictHostKeyChecking=no -l root "$HOST"
