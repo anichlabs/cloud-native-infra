@@ -48,4 +48,3 @@ runcmd:
   - [ bash, -lc, 'mkdir -p /etc/systemd/journald.conf.d &&
         printf "[Journal]\nSystemMaxUse=200M\nRuntimeMaxUse=100M\nMaxRetentionSec=7day\n" > /etc/systemd/journald.conf.d/99-privacy.conf &&
         systemctl restart systemd-journald' ]
-CLOUD
