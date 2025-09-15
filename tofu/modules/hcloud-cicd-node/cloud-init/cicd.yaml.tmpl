@@ -11,6 +11,7 @@ packages:
   - age
   - sops
   - bash-completion
+  - podman
 
 write_files:
   # Export a Docker-compatible socket only when using Podman (rootless, least privilege).
@@ -28,6 +29,33 @@ write_files:
     owner: root:root
     content: "placeholder"
 
+  # Forgejo server systemd unit
+  - path: /etc/systemd/system/forgejo.service
+    permissions: '0644'
+    owner: root:root
+    content: |
+      [Unit]
+      Description=Forgejo (self-hosted Git service)
+      After=network.target
+      # GDPR/AI-Act: run as dedicated least-privilege user via rootless Podman.
+
+      [Service]
+      User=forgejo
+      Group=forgejo
+      Restart=always
+      # Expose HTTP :3000 and SSH :222; persist data/config/logs under /srv/cicd/forgejo/*
+      ExecStart=/usr/bin/podman run --rm \
+        --name forgejo \
+        -p 3000:3000 -p 222:22 \
+        -v /srv/cicd/forgejo/data:/var/lib/gitea \
+        -v /srv/cicd/forgejo/config:/etc/gitea \
+        -v /srv/cicd/forgejo/log:/var/log/gitea \
+        codeberg.org/forgejo/forgejo:9
+      ExecStop=/usr/bin/podman stop -t 30 forgejo
+
+      [Install]
+      WantedBy=multi-user.target
+
 runcmd:
   - [ bash, -lc, 'set -euo pipefail' ]
 
@@ -43,6 +71,16 @@ runcmd:
 
   # Create guarded directories (0700) for later runner/Flux bootstrap. Do not start services yet.
   - [ bash, -lc, 'install -d -m 0700 -o root -g root /srv/cicd && install -d -m 0700 /srv/cicd/bootstrap' ]
+
+  # Create Forgejo system user & directories
+  - [ bash, -lc, 'id -u forgejo &>/dev/null || useradd -r -m -d /srv/cicd/forgejo -s /usr/sbin/nologin forgejo' ]
+  - [ bash, -lc, 'install -d -m 0750 -o forgejo -g forgejo /srv/cicd/forgejo/{data,config,log}' ]
+
+  # Enable lingering for rootless Podman user
+  - [ bash, -lc, 'loginctl enable-linger forgejo || true' ]
+
+  # Enable Forgejo server service
+  - [ bash, -lc, 'systemctl daemon-reload && systemctl enable --now forgejo' ]
 
   # Reduce log retention by default (privacy). Keep journald bounded and short.
   - [ bash, -lc, 'mkdir -p /etc/systemd/journald.conf.d &&

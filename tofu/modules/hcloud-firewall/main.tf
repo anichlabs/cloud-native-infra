@@ -78,4 +78,21 @@ resource "hcloud_firewall" "this" {
     protocol        = "icmp"
     destination_ips = ["0.0.0.0/0", "::/0"]
   }
+
+    // --- Inbound: Forgejo services.
+  rule {
+    description     = "Forgejo HTTP UI"
+    direction       = "in"
+    protocol        = "tcp"
+    port            = "3000"
+    source_ips      = ["0.0.0.0/0", "::/0"]
+  }
+
+  rule {
+    description     = "Forgejo SSH (port 222)"
+    direction       = "in"
+    protocol        = "tcp"
+    port            = "222"
+    source_ips      = ["0.0.0.0/0", "::/0"]
+  }
 }
